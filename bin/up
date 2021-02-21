@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+
+source "${BASH_SOURCE%/*}/.helpers.sh"
+
+docker_compose_in_env shared up -d
+
+WAIT_FOR_PG_ISREADY="while ! pg_isready --quiet; do sleep 1; done;"
+docker_compose_in_env shared exec postgres bash -c "$WAIT_FOR_PG_ISREADY"
+
+for ENV in development test
+do
+  # Create database for this environment if it doesn't already exist.
+  docker_compose_in_env shared exec postgres \
+    su - postgres -c "psql $ENV -c '' || createdb $ENV"
+
+  # Run migrations in this environment.
+  docker_compose_in_env $ENV run --rm --workdir=/srv/todo/storage backend \
+    npx knex migrate:latest
+done
+
+docker_compose_in_env development up -d

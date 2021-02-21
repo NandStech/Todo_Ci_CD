@@ -1,0 +1,68 @@
+services:
+- docker
+env:
+  global:
+  - DOCKER_COMPOSE_VERSION=1.27.4
+before_install:
+- sudo rm /usr/local/bin/docker-compose
+- curl -L https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-`uname
+  -s`-`uname -m` > docker-compose
+- chmod +x docker-compose
+- sudo mv docker-compose /usr/local/bin
+- docker --version
+- docker-compose version
+- echo "Login into Docker Hub"
+- echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+- export GIT_SHA=`git rev-parse --short HEAD`
+- echo "Building commit $GIT_SHA"
+- docker network create todo__default
+- docker volume create --name=todo_backend_node_modules
+- docker volume create --name=todo_frontend_node_modules
+- docker volume create --name=todo_storage_node_modules
+jobs:
+  include:
+  - stage: push_server
+    script:
+    - docker-compose build backend
+    - docker tag todo_ci_cd_backend:latest andyphied/todo_ci_cd_backend:$GIT_SHA
+    - docker push andyphied/todo_ci_cd_backend:$GIT_SHA
+    - docker tag todo_ci_cd_backend:latest andyphied/todo_ci_cd_backend:$TRAVIS_BRANCH
+    deploy:
+    - provider: script
+      script: docker push andyphied/todo_ci_cd_backend:$TRAVIS_BRANCH
+      on:
+        branch: master
+    - provider: script
+      script: docker push andyphied/todo_ci_cd_backend:$TRAVIS_TAG
+      on:
+        tags: true
+  - stage: push_frontend
+    script:
+    - docker-compose build frontend
+    - docker tag todo_ci_cd_frontend:latest andyphied/todo_ci_cd_frontend:$GIT_SHA
+    - docker push andyphied/todo_ci_cd_frontend:$GIT_SHA
+    - docker tag todo_ci_cd_frontend:latest andyphied/todo_ci_cd_frontend:$TRAVIS_BRANCH
+    deploy:
+    - provider: script
+      script: docker push andyphied/todo_ci_cd_frontend:$TRAVIS_BRANCH
+      on:
+        branch: master
+    - provider: script
+      script: docker push andyphied/todo_ci_cd_frontend:$TRAVIS_TAG
+      on:
+        tags: true
+  - stage: push_search
+    script:
+    - docker-compose build search
+    - docker tag todo_ci_cd_search:latest andyphied/todo_ci_cd_search:$GIT_SHA
+    - docker push andyphied/todo_ci_cd_search:$GIT_SHA
+    - docker tag todo_ci_cd_search:latest andyphied/todo_ci_cd_search:$TRAVIS_BRANCH
+    deploy:
+    - provider: script
+      script: docker push andyphied/todo_ci_cd_search:$TRAVIS_BRANCH
+      on:
+        branch: master
+    - provider: script
+      script: docker push andyphied/todo_ci_cd_search:$TRAVIS_TAG
+      on:
+        tags: true

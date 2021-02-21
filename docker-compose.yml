@@ -1,0 +1,73 @@
+version: '3.7'
+
+# Use the network set up in the shared compose file.
+networks:
+  default:
+    external: true
+    name: todo_${ENV}_default
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: todo/Dockerfile
+      target: development-backend
+    command: npx nodemon server.js
+    depends_on:
+      - search
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres/${ENV}
+      PORT: 8080
+    external_links:
+      - todo_postgres_1:postgres
+    volumes:
+      - ./todo/backend:/srv/todo/backend
+      - backend_node_modules:/srv/todo/backend/node_modules
+      - ./storage:/srv/todo/storage
+      - storage_node_modules:/srv/todo/storage/node_modules
+
+  frontend:
+    build:
+      context: .
+      dockerfile: todo/Dockerfile
+      target: development-frontend
+    command: npx webpack-dev-server
+    depends_on:
+      - backend
+    environment:
+      HOST: frontend
+      PORT: 8080
+    volumes:
+      - ./todo/frontend:/srv/todo/frontend
+      - frontend_node_modules:/srv/todo/frontend/node_modules
+      - ./storage:/srv/todo/storage
+      - storage_node_modules:/srv/todo/storage/node_modules
+
+  search:
+    build:
+      context: .
+      dockerfile: search/Dockerfile
+      target: development
+    command: npx nodemon server.js
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres/${ENV}
+      PORT: 8080
+    external_links:
+      - todo_postgres_1:postgres
+    volumes:
+      - ./search:/srv/todo/search
+      - backend_node_modules:/srv/todo/backend/node_modules
+      - ./storage:/srv/todo/storage
+      - storage_node_modules:/srv/todo/storage/node_modules
+
+# Use the node_modules volumes set up in the shared compose file.
+volumes:
+  backend_node_modules:
+    name: todo_backend_node_modules
+    external: true
+  frontend_node_modules:
+    name: todo_frontend_node_modules
+    external: true
+  storage_node_modules:
+    name: todo_storage_node_modules
+    external: true
